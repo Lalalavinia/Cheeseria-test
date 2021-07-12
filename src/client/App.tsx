@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect,useRef } from 'react';
 import { useQuery } from 'react-query';
 // Components
 import Item from './Cart/Item/Item';
 import Cart from './Cart/Cart';
+import PurchasedHistory from './Cart/Item/PurchasedHistory';
 import Drawer from '@material-ui/core/Drawer';
 import LinearProgress from '@material-ui/core/LinearProgress';
 import Grid from '@material-ui/core/Grid';
@@ -11,7 +12,7 @@ import RestoreIcon from '@material-ui/icons/Restore';
 import Badge from '@material-ui/core/Badge';
 // Styles
 import { Wrapper, StyledButton, StyledAppBar, HeaderTypography } from './App.styles';
-import { AppBar, Toolbar, Typography } from '@material-ui/core';
+import { Toolbar, Typography } from '@material-ui/core';
 // Types
 export type CartItemType = {
   id: number;
@@ -30,11 +31,21 @@ const getCheeses = async (): Promise<CartItemType[]> =>
 const App = () => {
   const [cartOpen, setCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState([] as CartItemType[]);
+  const [purchasedList,setPurchasedList]=useState([] as CartItemType[]);
+  const [historyOpen,setHistoryOpen] = useState(false);
+  const purchaseID = useRef(0);
+  const purchaseLists= useRef([]);
   const { data, isLoading, error } = useQuery<CartItemType[]>(
     'cheeses',
     getCheeses
   );
-  console.log(data);
+ 
+  useEffect(()=>{
+      let history =JSON.parse(localStorage.getItem("purchaseLists") || "{}");
+      if(history){
+        setPurchasedList(history);
+      }
+  },[]);
 
   const getTotalItems = (items: CartItemType[]) =>
     items.reduce((ack: number, item) => ack + item.amount, 0);
@@ -68,7 +79,20 @@ const App = () => {
       }, [] as CartItemType[])
     );
   };
+  const handlePurchaseClick=() =>{
+    purchaseLists.current[purchaseID.current] =  cartItems;
+    localStorage.setItem("purchaseLists",JSON.stringify(purchaseLists.current));
+    purchaseID.current += 1
+    setCartOpen(false);
+    setPurchasedList(cartItems);
+    setCartItems([] as CartItemType[]);
+    console.log(purchaseLists.current);
+  }
 
+  const retrieveHistory=()=>{
+    setHistoryOpen(true);
+  }
+  
   if (isLoading) return <LinearProgress />;
   if (error) return <div>Something went wrong ...</div>;
 
@@ -83,12 +107,21 @@ const App = () => {
             justify="space-between"
             alignItems="center"
           >
-            <StyledButton>
+            <StyledButton onClick={retrieveHistory}>
               <RestoreIcon />
               <Typography variant="subtitle2">
                 Recent Purchases
               </Typography>
             </StyledButton>
+          
+
+            <Drawer anchor='left' open={historyOpen} onClose={() => setHistoryOpen(false)}>
+            <h2>Your purchase history:</h2>
+            {purchaseLists.current.map(list =>{
+              return <PurchasedHistory purchaseList={list} totalNumber={getTotalItems(list)}/>
+            })}
+            
+            </Drawer>
 
             <HeaderTypography variant="h3" noWrap>
               Welcome to Patient Zero's Cheeseria
@@ -116,6 +149,7 @@ const App = () => {
           cartItems={cartItems}
           addToCart={handleAddToCart}
           removeFromCart={handleRemoveFromCart}
+          purchaseClick={handlePurchaseClick}
         />
       </Drawer>
 
